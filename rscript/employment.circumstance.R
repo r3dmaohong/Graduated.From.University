@@ -8,20 +8,28 @@ library(readxl)
 library(dplyr)
 library(RecordLinkage)
 library(data.table)
-options(java.parameters = "-Xmx3g")
+options(java.parameters = "-Xmx4g")
 library(XLConnect)
 library(pbapply)
 
 ##Import all files.
 files <- list.files(file.path('raw data','就業藍圖所有學校原始資料'),full.names = TRUE)
+##Something went wrong with lapply
 files.lists <- pblapply(files,function(file.name){
-  ##excel_sheets(file.name) ##Get all sheets' name
-  #readWorksheet(loadWorkbook(file.name), sheet = x, header = TRUE)
   wb <- loadWorkbook(file.name)
-  file.list <- readWorksheet(wb, sheet = getSheets(wb)) ##Read all sheets in a xlsx file as a list.
-  file.list <- do.call(rbind,file.list) ##Turn the list into a data frame.
+  ##Read all sheets in a xlsx file as a list.
+  file.list <- readWorksheet(wb, sheet = getSheets(wb)) 
+  ##Turn the list into a data frame.
+  file.list <- do.call(rbind,file.list) 
+  gc()
+  rm(wb)
+  ##If the file only have 1 sheet, it should use method below to traslate to data frame.
+  if(class(file.list)!="data.frame")
+    file.list <- data.frame(t(file.list),stringsAsFactors=F)
   return(file.list)
 })
+
+##Combine all the lists into data frame.
 total.data <- do.call(rbind,files.lists)
 rm(files.lists,files)
 ##save the environment.
@@ -33,17 +41,19 @@ industry.transform <- read_excel("raw data\\產業新類別vs舊類別.xlsx",1)
 setwd(file.path('Graduated.From.University'))
 dir.create('output', showWarnings = FALSE)
 
-##total.data
+##Remove redundant curriculum vitae.
 total.data$履歷編號 <- NULL
 total.data <- unique(total.data)
 nrow(total.data)
 
+##Correct colleges' name.
 college.name.transfer <- read.csv("學校名稱正規化表格.csv",stringsAsFactors=F)
 
 ##First job
 first.job <- total.data[,c("學校代碼", "學校名稱", "科系名稱", "科系類別代號", 
                           "科系類別名稱", "產業小類代碼", "產業小類名稱", 
                           "職務小類代碼", "職務小類名稱")]
+##Remove curriculum vitae without first job.
 nrow(first.job)
 first.job %>% filter(職務小類名稱!="") %>% nrow()
 first.job <- first.job %>% filter(職務小類名稱!="")
@@ -63,9 +73,10 @@ for(x in 1:length(uni.college.names)){
 
 }
 
+##Create new col to record whether it's error or not.
 first.job$正規化科系名稱 <- ""
 first.job$error <- 0
-
+##Correct departments' name
 unique.college.department <- unique(first.job[,c("學校名稱", "科系名稱")])
 
 for(x in 1:nrow(unique.college.department)){
@@ -88,10 +99,12 @@ for(x in 1:nrow(unique.college.department)){
   }
 }
 
+##Remove data with error. (==1) 
 nrow(first.job[first.job$error==0,])
 first.job = first.job[first.job$error==0,]
 first.job$error = NULL
 
+##Counting job freq in each department of college.
 tmp.first <- first.job[,c("學校名稱", "正規化科系名稱","職務小類名稱")]
 names(tmp.first) <- c("school","department","job")
 tmp.first <- tmp.first %>% group_by(., school, department, job)
@@ -99,10 +112,10 @@ count.first.job <- summarize(tmp.first,count=n())
 count.first.job <- count.first.job %>% arrange(., school, department, -count)
 #count.first.job <- count.first.job %>% mutate(., percentage=count/sum(count))
 
-##combine
+##Combine with old standard file.
 standard.job <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
 names(standard.job)
-standard.job.first <- standard.job[,c("學校名稱", "科系名稱", "名稱.一.", "樣本數.一.")]
+standard.job.first <- standard.job[standard.job$"類別.0.職務..1.產業")==0,c("學校名稱", "科系名稱", "名稱.一.", "樣本數.一.")]
 names(standard.job.first) <- c("school","department","job","count")
 
 count.first.job <- rbind(count.first.job,standard.job.first)
@@ -111,8 +124,10 @@ count.first.job <- count.first.job[count.first.job$count!="NULL",]
 #write.csv(count.first.job, "合併前查看.csv",row.names=F)
 count.first.job <- count.first.job %>% mutate(., count=sum(as.numeric(count)))
 
+##Move part-time worker and others to the last of the data frame.
 count.first.job <- rbind(count.first.job[count.first.job$job!="工讀生" & count.first.job$job!="其他",],count.first.job[count.first.job$job=="工讀生" | count.first.job$job=="其他",])
 
+##Get each departments of colleges first 10 jobs.
 tmp.uni <- count.first.job[,c("school", "department")] %>% unique
 for(x in 1:nrow(tmp.uni)){
   tmp <- count.first.job[which(count.first.job$school==tmp.uni$school[x] & count.first.job$department==tmp.uni$department[x]),] %>% head(.,10)
@@ -125,5 +140,7 @@ for(x in 1:nrow(tmp.uni)){
   
   cat("\r",format(round(x/nrow(tmp.uni)*100,2),nsmall=2)," % ")
 }
+
+##To be continued...
 
 write.csv(total.tmp, "各校就業狀況-職務.csv",row.names=F)
