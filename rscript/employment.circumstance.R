@@ -6,11 +6,12 @@ original_path <- getwd()
 ##Libraries
 library(readxl)
 library(dplyr)
-library(RecordLinkage)
+#library(RecordLinkage)
 library(data.table)
 options(java.parameters = "-Xmx4g")
 library(XLConnect)
 library(pbapply)
+library(stringdist)
 
 ##Import all files.
 files <- list.files(file.path('raw data','就業藍圖所有學校原始資料'),full.names = TRUE)
@@ -92,7 +93,8 @@ for(x in 1:nrow(unique.college.department)){
   if(length(department.x) > 0)
   {
     word <- unique.college.department$科系名稱[x]
-    first.job$正規化科系名稱[first.job$學校名稱==unique.college.department$學校名稱[x] & first.job$科系名稱==unique.college.department$科系名稱[x]] = department.x[which.max(jarowinkler(word,department.x))[1]]
+    ##department.x[which.max(jarowinkler(word,department.x))[1]]
+    first.job$正規化科系名稱[first.job$學校名稱==unique.college.department$學校名稱[x] & first.job$科系名稱==unique.college.department$科系名稱[x]] = department.x[which.max(1-stringdist(word,department.x ,method='jw'))[1]]
     cat(unique.college.department$科系名稱[x] , " ", department.x[which.max(jarowinkler(word,department.x))[1]],rep(" ",50))
   }else{
     first.job$error[first.job$學校名稱==unique.college.department$學校名稱[x] & first.job$科系名稱==unique.college.department$科系名稱[x]] <- 1
@@ -116,13 +118,13 @@ count.first.job <- count.first.job %>% arrange(., school, department, -count)
 ##Combine with old standard file.
 standard.job <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
 names(standard.job)
-standard.job.first <- standard.job[standard.job$"類別.0.職務..1.產業")==0,c("學校名稱", "科系名稱", "名稱.一.", "樣本數.一.")]
+standard.job.first <- standard.job[standard.job$"類別.0.職務..1.產業"==0,c("學校名稱", "科系名稱", "名稱.一.", "樣本數.一.")]
 names(standard.job.first) <- c("school","department","job","count")
 
 count.first.job <- rbind(count.first.job,standard.job.first)
 count.first.job <- count.first.job %>% group_by(., school, department, job)
 count.first.job <- count.first.job[count.first.job$count!="NULL",]
-#write.csv(count.first.job, "合併前查看.csv",row.names=F)
+#write.csv(count.first.job, "合併前查看2.csv",row.names=F)
 count.first.job <- count.first.job %>% mutate(., count=sum(as.numeric(count)))
 
 ##Move part-time worker and others to the last of the data frame.
