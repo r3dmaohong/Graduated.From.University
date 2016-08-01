@@ -35,8 +35,9 @@ rm(files.lists,files)
 ##save the environment.
 ##save.image("D:/abc/wjhong/projects/Graduated.From.University/import.complete.RData")
 ##load("D:/abc/wjhong/projects/Graduated.From.University/import.complete.RData")
-total.school.lookup.table <- read_excel("raw data\\105 科系職涯地圖-學系資料(進行中).xlsx",1)
-industry.transform <- read_excel("raw data\\產業新類別vs舊類別.xlsx",1)
+total.school.lookup.table <- read.csv("raw data\\最新學校科系資料.csv",stringsAsFactors=F)
+industry.transform <- read.csv("raw data\\產業新類別vs舊類別.csv",stringsAsFactors=F)
+
 
 setwd(file.path('Graduated.From.University'))
 dir.create('output', showWarnings = FALSE)
@@ -82,7 +83,7 @@ unique.college.department <- unique(first.job[,c("學校名稱", "科系名稱")])
 for(x in 1:nrow(unique.college.department)){
   #jarowinkler('資管',c('資訊管理系','資訊工程學系'))
   ##check if having value in lookup table first.
-  department.x <- total.school.lookup.table[which(unique.college.department$學校名稱[x] == total.school.lookup.table$學校名稱),"科系名稱（藍字=105新增；綠字=改名；橘字=合併；紅字=停招）"]
+  department.x <- total.school.lookup.table[which(unique.college.department$學校名稱[x] == total.school.lookup.table$學校名稱),"科系名稱.藍字.105新增.綠字.改名.橘字.合併.紅字.停招."]
   department.x <- unlist(c(department.x))
   names(department.x)=NULL
   
