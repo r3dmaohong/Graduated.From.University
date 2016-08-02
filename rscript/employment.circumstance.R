@@ -38,14 +38,14 @@ rm(files.lists,files)
 ##load("D:/abc/wjhong/projects/Graduated.From.University/import.complete.RData")
 total.school.lookup.table <- read.csv("raw data\\最新學校科系資料.csv",stringsAsFactors=F)
 industry.transform <- read.csv("raw data\\產業新類別vs舊類別.csv",stringsAsFactors=F)
-
+job.transform <- read.csv("raw data\\職務小類轉換表.csv",stringsAsFactors=F)
 
 setwd(file.path('Graduated.From.University'))
 dir.create('output', showWarnings = FALSE)
 
 ##Remove redundant curriculum vitae.
 total.data$履歷編號 <- NULL
-total.data <- unique(total.data)
+total.data <- setDF(unique(setDT(total.data)))
 nrow(total.data)
 
 ##Correct colleges' name.
@@ -84,7 +84,8 @@ unique.college.department <- unique(first.job[,c("學校名稱", "科系名稱")])
 for(x in 1:nrow(unique.college.department)){
   #jarowinkler('資管',c('資訊管理系','資訊工程學系'))
   ##check if having value in lookup table first.
-  department.x <- total.school.lookup.table[which(unique.college.department$學校名稱[x] == total.school.lookup.table$學校名稱),"科系名稱.藍字.105新增.綠字.改名.橘字.合併.紅字.停招."]
+  department.x <- total.school.lookup.table[which(unique.college.department$學校名稱[x] == total.school.lookup.table$學校名稱)
+                                            ,"科系名稱.藍字.105新增.綠字.改名.橘字.合併.紅字.停招."]
   department.x <- unlist(c(department.x))
   names(department.x)=NULL
   
@@ -95,12 +96,16 @@ for(x in 1:nrow(unique.college.department)){
     word <- unique.college.department$科系名稱[x]
     ##department.x[which.max(jarowinkler(word,department.x))[1]]
     first.job$正規化科系名稱[first.job$學校名稱==unique.college.department$學校名稱[x] & first.job$科系名稱==unique.college.department$科系名稱[x]] = department.x[which.max(1-stringdist(word,department.x ,method='jw'))[1]]
-    cat(unique.college.department$科系名稱[x] , " ", department.x[which.max(jarowinkler(word,department.x))[1]],rep(" ",50))
+    cat(unique.college.department$科系名稱[x] , " ", department.x[which.max(1-stringdist(word,department.x ,method='jw'))[1]],rep(" ",50))
   }else{
     first.job$error[first.job$學校名稱==unique.college.department$學校名稱[x] & first.job$科系名稱==unique.college.department$科系名稱[x]] <- 1
     print(sprintf("Index %s Error: %s %s", x, unique.college.department$學校名稱[x], unique.college.department$科系名稱[x]))
   }
 }
+
+##save the environment.
+##save.image("D:/abc/wjhong/projects/Graduated.From.University/names.tranfer.complete.RData")
+##load("D:/abc/wjhong/projects/Graduated.From.University/names.tranfer.complete.RData")
 
 ##Remove data with error. (==1) 
 nrow(first.job[first.job$error==0,])
@@ -112,14 +117,17 @@ tmp.first <- first.job[,c("學校名稱", "正規化科系名稱","職務小類名稱")]
 names(tmp.first) <- c("school","department","job")
 tmp.first <- tmp.first %>% group_by(., school, department, job)
 count.first.job <- summarize(tmp.first,count=n()) 
-count.first.job <- count.first.job %>% arrange(., school, department, -count)
-#count.first.job <- count.first.job %>% mutate(., percentage=count/sum(count))
 
 ##Combine with old standard file.
 standard.job <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
 names(standard.job)
 standard.job.first <- standard.job[standard.job$"類別.0.職務..1.產業"==0,c("學校名稱", "科系名稱", "名稱.一.", "樣本數.一.")]
 names(standard.job.first) <- c("school","department","job","count")
+
+##Old names to new names
+for(i in 1:nrow(job.transform)){
+  standard.job.first$job[standard.job.first$job==job.transform$old[i]] <- job.transform$new[i]
+}
 
 count.first.job <- rbind(count.first.job,standard.job.first)
 count.first.job <- count.first.job %>% group_by(., school, department, job)
@@ -128,22 +136,45 @@ count.first.job <- count.first.job[count.first.job$count!="NULL",]
 count.first.job <- count.first.job %>% mutate(., count=sum(as.numeric(count)))
 
 ##Move part-time worker and others to the last of the data frame.
+#count.first.job <- count.first.job %>% arrange(., school, department, -count)
+count.first.job <- unique(count.first.job)
+count.first.job <- count.first.job[order(count.first.job$school,count.first.job$department,-count.first.job$count),]
 count.first.job <- rbind(count.first.job[count.first.job$job!="工讀生" & count.first.job$job!="其他",],count.first.job[count.first.job$job=="工讀生" | count.first.job$job=="其他",])
 
+count.first.job <- count.first.job %>% group_by(school, department) %>% mutate(., percentage=count/sum(count))
+
 ##Get each departments of colleges first 10 jobs.
+#count.first.job <- count.first.job %>% group_by(school, department) %>% top_n(n = 10)
+cl <- makeCluster(2) ##2
+registerDoSNOW(cl)
+pb <- txtProgressBar(min = 1, max = nrow(tmp.uni), style = 3)
+print("Output data format processing...")
 tmp.uni <- count.first.job[,c("school", "department")] %>% unique
-for(x in 1:nrow(tmp.uni)){
-  tmp <- count.first.job[which(count.first.job$school==tmp.uni$school[x] & count.first.job$department==tmp.uni$department[x]),] %>% head(.,10)
-  tmp <- rbind(head(tmp,10), unlist(c(tmp[1,1:2],"其他", (tmp[1,4]/tmp[1,5]*(1-sum(tmp$percentage))), (1-sum(tmp$percentage)))))
-  
-  if(x==1)
-    total.tmp <- tmp
-  else
-    total.tmp <- rbind(total.tmp,tmp)
-  
-  cat("\r",format(round(x/nrow(tmp.uni)*100,2),nsmall=2)," % ")
+dopar.first.job <- foreach (x = 1:nrow(tmp.uni), .combine=rbind) %dopar% {
+  tmp <- head(count.first.job[which(count.first.job$school==tmp.uni$school[x] & count.first.job$department==tmp.uni$department[x]),], 10)
+  if(nrow(tmp)<10){
+    tmp <- rbind(tmp, setNames(data.frame(matrix(rep(c(tmp$school[1], tmp$department[1], NA, NA, NA),11-nrow(tmp)), byrow=T, ncol=5)),names(tmp)))    
+  }else{
+    tmp <- rbind(head(tmp,10), unlist(c(tmp[1,1:2],"其他", (tmp[1,4]/tmp[1,5]*(1-sum(tmp$percentage))), (1-sum(tmp$percentage))))) 
+  }
+  setTxtProgressBar(pb, x) 
+  return(tmp)
 }
+close(pb)
+stopCluster(cl)
+
+#for(x in 1:nrow(tmp.uni)){
+#  tmp <- count.first.job[which(count.first.job$school==tmp.uni$school[x] & count.first.job$department==tmp.uni$department[x]),] %>% head(.,10)
+#  tmp <- rbind(head(tmp,10), unlist(c(tmp[1,1:2],"其他", (tmp[1,4]/tmp[1,5]*(1-sum(tmp$percentage))), (1-sum(tmp$percentage)))))
+#  
+#  if(x==1)
+#    total.tmp <- tmp
+#  else
+#    total.tmp <- rbind(total.tmp,tmp)
+#  
+#  cat("\r 整合成 Top 10 格式 ",format(round(x/nrow(tmp.uni)*100,2),nsmall=2)," % ")
+#}
 
 ##To be continued...
 
-write.csv(total.tmp, "各校就業狀況-職務.csv",row.names=F)
+write.csv(dopar.first.job, "output/各校就業狀況-職務.csv",row.names=F)
