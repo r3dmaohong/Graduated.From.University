@@ -54,11 +54,18 @@ college.name.transfer <- read.csv("學校名稱正規化表格.csv",stringsAsFactors=F)
 ##First job
 first.job <- total.data[,c("學校代碼", "學校名稱", "科系名稱", "科系類別代號", 
                           "科系類別名稱", "產業小類代碼", "產業小類名稱", 
-                          "職務小類代碼", "職務小類名稱")]
+                          "職務小類代碼", "職務小類名稱", "產業小類代碼1",
+                          "產業小類名稱1", "職務小類代碼1", "職務小類名稱1"
+                          , "產業小類代碼2", "產業小類名稱2", "職務小類代碼2"
+                          , "職務小類名稱2", "產業小類代碼3", "產業小類名稱3", 
+                          "職務小類代碼3", "職務小類名稱3")]
 ##Remove curriculum vitae without first job.
 nrow(first.job)
-first.job %>% filter(職務小類名稱!="") %>% nrow()
-first.job <- first.job %>% filter(職務小類名稱!="")
+#first.job %>% filter(職務小類名稱!="") %>% nrow()
+#first.job <- first.job %>% filter(職務小類名稱!="")
+
+first.job$學校名稱 <- iconv(first.job$學校名稱,"UTF-8")
+first.job$科系名稱 <- iconv(first.job$科系名稱,"UTF-8")
 
 ##Correct colleges' name
 uni.college.names <- unique(first.job$學校名稱)
@@ -72,7 +79,6 @@ for(x in 1:length(uni.college.names)){
     
     cat(uni.college.names[x], "==> ", tmp, rep(" ",50))
   }
-
 }
 
 ##Create new col to record whether it's error or not.
@@ -106,6 +112,24 @@ for(x in 1:nrow(unique.college.department)){
 ##save the environment.
 ##save.image("D:/abc/wjhong/projects/Graduated.From.University/names.tranfer.complete.RData")
 ##load("D:/abc/wjhong/projects/Graduated.From.University/names.tranfer.complete.RData")
+
+if(no.job==1){
+  num.of.job <- first.job[,c("學校代碼", "學校名稱", "科系名稱", "科系類別代號", 
+                              "科系類別名稱", "產業小類代碼", "產業小類名稱", 
+                              "職務小類代碼", "職務小類名稱")]
+}else{
+  num.of.job <- first.job[,c("學校代碼", "學校名稱", "科系名稱", "科系類別代號", 
+                              "科系類別名稱", 
+                              paste0(c("產業小類代碼", "產業小類名稱", "職務小類代碼",
+                                       "職務小類名稱"),no.job-1))]
+}
+names(num.of.job) <- c("學校代碼", "學校名稱", "科系名稱", "科系類別代號", 
+                       "科系類別名稱", "產業小類代碼", "產業小類名稱", 
+                       "職務小類代碼", "職務小類名稱")
+
+
+first.job %>% filter(職務小類名稱!="") %>% nrow()
+first.job <- first.job %>% filter(職務小類名稱!="")
 
 ##Remove data with error. (==1) 
 nrow(first.job[first.job$error==0,])
@@ -163,17 +187,7 @@ dopar.first.job <- foreach (x = 1:nrow(tmp.uni), .combine=rbind) %dopar% {
 close(pb)
 stopCluster(cl)
 
-#for(x in 1:nrow(tmp.uni)){
-#  tmp <- count.first.job[which(count.first.job$school==tmp.uni$school[x] & count.first.job$department==tmp.uni$department[x]),] %>% head(.,10)
-#  tmp <- rbind(head(tmp,10), unlist(c(tmp[1,1:2],"其他", (tmp[1,4]/tmp[1,5]*(1-sum(tmp$percentage))), (1-sum(tmp$percentage)))))
-#  
-#  if(x==1)
-#    total.tmp <- tmp
-#  else
-#    total.tmp <- rbind(total.tmp,tmp)
-#  
-#  cat("\r 整合成 Top 10 格式 ",format(round(x/nrow(tmp.uni)*100,2),nsmall=2)," % ")
-#}
+dopar.first.job[which(dopar.first.job$job=="工讀生"),c("job", "count", "percentage")] <- c(NA, NA, NA)
 
 ##To be continued...
 
