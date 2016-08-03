@@ -10,7 +10,7 @@ library(dplyr)
 library(data.table)
 options(java.parameters = "-Xmx4g")
 library(XLConnect)
-library(pbapply)
+#library(pbapply)
 library(stringdist)
 library(tmcn)
 library(foreach) 
@@ -118,7 +118,7 @@ for(x in 1:nrow(unique.college.department)){
 ##load("D:/abc/wjhong/projects/Graduated.From.University/names.tranfer.complete.RData")
 
 ##no.job:1~4 (first job ? ... or the forth one?)   ; type: 0(職務) or 1(產業)
-job_func <- function(no.job,type){
+job_func <- function(no.job,type){  
   if(no.job==1){
     num.of.job <- first.job[,c("學校代碼", "學校名稱", "正規化科系名稱", "科系類別代號", 
                                "科系類別名稱", "產業小類代碼", "產業小類名稱", 
@@ -133,9 +133,15 @@ job_func <- function(no.job,type){
                          "科系類別名稱", "產業小類代碼", "產業小類名稱", 
                          "職務小類代碼", "職務小類名稱","error")
   
-  
-  num.of.job %>% filter(職務小類名稱!="") %>% nrow()
-  num.of.job <- num.of.job %>% filter(職務小類名稱!="")
+  if(type==1)
+    col2p <- "產業小類名稱"
+  if(type==0)
+    col2p <- "職務小類名稱"
+  print(paste0(substr(col2p,1,2)," => ", no.job))
+  ##num.of.job %>% filter(職務小類名稱!="") %>% nrow()
+  ##num.of.job <- num.of.job %>% filter(職務小類名稱!="")
+  eval(parse(text=paste0("num.of.job %>% filter(",col2p,"!='') %>% nrow()")))
+  num.of.job <- eval(parse(text=paste0("num.of.job %>% filter(",col2p,"!='')")))
   
   ##Remove data with error. (==1) 
   nrow(num.of.job[num.of.job$error==0,])
@@ -143,7 +149,7 @@ job_func <- function(no.job,type){
   num.of.job$error = NULL
   
   ##Counting job freq in each department of college.
-  tmp.first <- num.of.job[,c("學校名稱", "正規化科系名稱","職務小類名稱")]
+  tmp.first <- num.of.job[,c("學校名稱", "正規化科系名稱",col2p)]
   names(tmp.first) <- c("school","department","job")
   tmp.first <- tmp.first %>% group_by(., school, department, job)
   count.num.of.job <- summarize(tmp.first,count=n()) 
@@ -178,7 +184,7 @@ job_func <- function(no.job,type){
   cl <- makeCluster(2) ##2
   registerDoSNOW(cl)
   tmp.uni <- count.num.of.job[,c("school", "department")] %>% unique
-  pb <- txtProgressBar(min = 1, max = nrow(tmp.uni), style = 3)
+  #pb <- txtProgressBar(min = 1, max = nrow(tmp.uni), style = 3)
   print("Output data format processing...")
   
   dopar.num.of.job <- foreach (x = 1:nrow(tmp.uni), .combine=rbind) %dopar% {
@@ -188,10 +194,10 @@ job_func <- function(no.job,type){
     }else{
       tmp <- rbind(head(tmp,10), unlist(c(tmp[1,1:2],"其他", (tmp[1,4]/tmp[1,5]*(1-sum(tmp$percentage))), (1-sum(tmp$percentage))))) 
     }
-    setTxtProgressBar(pb, x) 
+    #setTxtProgressBar(pb, x) 
     return(tmp)
   }
-  close(pb)
+  #close(pb)
   stopCluster(cl)
   
   dopar.num.of.job[which(dopar.num.of.job$job=="工讀生"),c("job", "count", "percentage")] <- c(NA, NA, NA)
@@ -199,7 +205,11 @@ job_func <- function(no.job,type){
   return(dopar.num.of.job)
 }
 
+##tmp <- job_func(1)
+##write.csv(tmp, "output/各校就業狀況-產業-2.csv",row.names=F)
 
-tmp <- job_func(1)
-write.csv(tmp, "output/各校就業狀況-職務-1.csv",row.names=F)
+total.output.lst <- list()
+for(x in 1:4){
+  total.output.lst[x] <- job_func(x,0)
+}
 
