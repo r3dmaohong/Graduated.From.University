@@ -119,6 +119,7 @@ for(x in 1:nrow(unique.college.department)){
 
 ##no.job:1~4 (first job ? ... or the forth one?)   ; type: 0(職務) or 1(產業)
 job_func <- function(no.job,type){  
+  gc()
   if(no.job==1){
     num.of.job <- first.job[,c("學校代碼", "學校名稱", "正規化科系名稱", "科系類別代號", 
                                "科系類別名稱", "產業小類代碼", "產業小類名稱", 
@@ -210,6 +211,6 @@ job_func <- function(no.job,type){
 
 total.output.lst <- list()
 for(x in 1:4){
-  total.output.lst[x] <- job_func(x,0)
+  total.output.lst[[x]] <- job_func(x,0)
 }
 
