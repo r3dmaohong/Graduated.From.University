@@ -175,7 +175,10 @@ job_func <- function(no.job,type){
   
   ##Combine with old standard file.
   standard.job <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
-  names(standard.job)
+  #names(standard.job)
+  if(grepl("名稱",names(standard.job)[7]) & grepl("名稱",names(standard.job)[16])){
+    names(standard.job)[7:18] <- as.vector(sapply(1:4,function(x) paste0(c("名稱", "樣本數", "百分比"),x)))
+  }
   standard.job.first <- standard.job[standard.job$"類別.0.職務..1.產業."==type,c("學校名稱", "科系名稱", paste0(c("名稱", "樣本數"), no.job))]
   names(standard.job.first) <- c("school","department","job","count")
   
@@ -224,12 +227,51 @@ job_func <- function(no.job,type){
   return(dopar.num.of.job)
 }
 
-##tmp <- job_func(1)
-##write.csv(tmp, "output/各校就業狀況-產業-2.csv",row.names=F)
-
+##job analysis
 total.output.lst <- list()
 for(x in 1:4){
   total.output.lst[[x]] <- job_func(x,0)
+  total.output.lst[[x]]$rank <- 1:11
 }
-write.csv(total.output.lst[[1]],"test.csv",row.names=F)
+job.area.frame <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
+names(job.area.frame)[7:18]
+job.area.frame[,7:18] <- "NULL"
+names(job.area.frame)[c(1,2,20)] <- c("school", "department", "rank")
+##job output
+if(T){
+  job.frame <- job.area.frame[job.area.frame$類別.0.職務..1.產業.==0,]
+  
+  for(x in 1:4){
+    job.frame <-merge(x = job.frame, y = total.output.lst[[x]], by = c("school", "department", "rank"), all.x = TRUE)  
+  }
+  names(job.frame)
+  job.frame <- job.frame[,-c(8:19)]
+  names(job.frame) <- c("學校名稱", "科系名稱", "排名", "1111學校代碼", "教育部科系代碼", "代碼數", "學級", "類別(0=職務; 1=產業)", "名稱1", "樣本數1", "百分比1", "名稱2", "樣本數2", "百分比2", "名稱3", "樣本數3", "百分比3", "名稱4", "樣本數4", "百分比4")
+  job.frame <- job.frame[,c("學校名稱", "科系名稱", "1111學校代碼", "教育部科系代碼", "代碼數", "學級", "名稱1", "樣本數1", "百分比1", "名稱2", "樣本數2", "百分比2", "名稱3", "樣本數3", "百分比3", "名稱4", "樣本數4", "百分比4", "類別(0=職務; 1=產業)", "排名")]
+}
+##area analysis
+total.output.lst <- list()
+for(x in 1:4){
+  total.output.lst[[x]] <- job_func(x,1)
+  total.output.lst[[x]]$rank <- 1:11
+}
+##area output
+if(T){
+  job.area.frame <- read.csv("就業藍圖基準.csv",stringsAsFactors=F)
+  names(job.area.frame)[7:18]
+  job.area.frame[,7:18] <- "NULL"
+  names(job.area.frame)[c(1,2,20)] <- c("school", "department", "rank")
+  area.frame <- job.area.frame[job.area.frame$類別.0.職務..1.產業.==1,]
+  
+  for(x in 1:4){
+    area.frame <-merge(x = area.frame, y = total.output.lst[[x]], by = c("school", "department", "rank"), all.x = TRUE)  
+  }
+  names(area.frame)
+  area.frame <- area.frame[,-c(8:19)]
+  names(area.frame) <- c("學校名稱", "科系名稱", "排名", "1111學校代碼", "教育部科系代碼", "代碼數", "學級", "類別(0=職務; 1=產業)", "名稱1", "樣本數1", "百分比1", "名稱2", "樣本數2", "百分比2", "名稱3", "樣本數3", "百分比3", "名稱4", "樣本數4", "百分比4")
+  area.frame <- area.frame[,c("學校名稱", "科系名稱", "1111學校代碼", "教育部科系代碼", "代碼數", "學級", "名稱1", "樣本數1", "百分比1", "名稱2", "樣本數2", "百分比2", "名稱3", "樣本數3", "百分比3", "名稱4", "樣本數4", "百分比4", "類別(0=職務; 1=產業)", "排名")]
+}
+total.frame <- rbind(job.frame,area.frame)
+
+write.csv(total.frame,"test.csv",row.names=F)
 
