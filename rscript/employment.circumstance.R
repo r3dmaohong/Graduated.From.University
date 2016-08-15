@@ -10,7 +10,7 @@ library(dplyr)
 library(data.table)
 options(java.parameters = "-Xmx4g")
 library(XLConnect)
-#library(pbapply)
+library(pbapply)
 library(stringdist)
 library(tmcn)
 library(foreach) 
@@ -273,5 +273,5 @@ if(T){
 }
 total.frame <- rbind(job.frame,area.frame)
 
-write.csv(total.frame,"test.csv",row.names=F)
+write.csv(total.frame,"output\\2016´N·~ÂÅ¹Ï.csv",row.names=F)
 
